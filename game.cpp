@@ -12,9 +12,8 @@ static constexpr size_t SCREEN_HEIGHT = 600;
 static constexpr char FONT_PATH[] =
     "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf";
 
-static constexpr size_t TARGET_FPS = 60;
-
-struct GameBoard {
+/* ==== Game ==== */
+typedef struct GameBoard {
     u16 width, height;
 
     u16 *data = nullptr;
@@ -44,27 +43,41 @@ struct GameBoard {
         this->data[y * width + x] = value;
         return true;
     }
+} GameBoard;
+
+typedef struct GameConfig {
+    u16 width, height;
+} GameConfig;
+
+void initGame(GameConfig const &config, GameBoard &game) {
+    game.init(config.width, config.height);
+}
+
+/* ==== Rendering ==== */
+struct GameRenderer {
+    u16 screen_width, screen_height;
+    const char *window_name;
+    SDL_Window *window = nullptr;
+    SDL_Renderer *renderer = nullptr;
+    u16 target_fps = 60;
 };
 
-struct GameStatus {
-    GameBoard board;
-    i32 selected_cell;
+void renderGame(GameBoard const &board, GameRenderer &game_renderer) {
 
-    void init(u16 width, u16 height) {
-        board.init(width, height);
-        selected_cell = -1;
-    }
-} game_status;
+    auto &renderer = game_renderer.renderer;
+    // Actual render loop
+    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+    SDL_RenderClear(renderer);
 
-struct GameRenderConfig{};
+    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0x00, 0xFF);
 
-void render_status(GameStatus* status);
+    SDL_RenderPresent(renderer);
 
+    // Nothing to render yet
+    SDL_Delay(1000 / game_renderer.target_fps); // ~60 FPS
+}
 
-int main(int argc, char *argv[]) {
-
-    game_status.init(4, 5);
-
+i32 initRenderer(GameRenderer &config) {
     // 1. Initialize SDL (video subsystem only)
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
@@ -78,121 +91,77 @@ int main(int argc, char *argv[]) {
     }
 
     // 2. Create window
-    SDL_Window *window =
-        SDL_CreateWindow("Hello SDL2", SDL_WINDOWPOS_CENTERED,
-                         SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_SHOWN);
+    config.window = SDL_CreateWindow(
+        config.window_name, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        config.screen_width, config.screen_height, SDL_WINDOW_SHOWN);
 
-    if (!window) {
+    if (!config.window) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
         SDL_Quit();
         return 1;
     }
 
     // Create renderer
-    SDL_Renderer *renderer =
-        SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    if (!renderer) {
+    config.renderer =
+        SDL_CreateRenderer(config.window, -1, SDL_RENDERER_ACCELERATED);
+    if (!config.renderer) {
         std::cerr << "Renderer could not be created!" << std::endl
                   << "SDL_Error: " << SDL_GetError() << std::endl;
         SDL_Quit();
         return 1;
     }
 
-    // Simple object
-    SDL_Rect exampleRect;
-    exampleRect.w = std::min(SCREEN_HEIGHT, SCREEN_WIDTH) / 3;
-    exampleRect.h = std::min(SCREEN_HEIGHT, SCREEN_WIDTH) / 2;
+    return 0;
+}
 
-    exampleRect.x = SCREEN_WIDTH / 2 - exampleRect.w / 2;
-    exampleRect.y = SCREEN_HEIGHT / 2 - exampleRect.h / 2;
-
-    // Text inside the object
-    TTF_Font *font = TTF_OpenFont(FONT_PATH, 24);
-    if (!font) {
-        std::cerr << "Error loading font from: " << FONT_PATH << std::endl;
-        SDL_Quit();
-        return 1;
-    }
-
-    SDL_Texture *textTexture;
-    {
-
-        SDL_Color textColor = {0, 0, 0, 255};
-        SDL_Surface *textSurface =
-            TTF_RenderText_Blended(font, "Hello World", textColor);
-        textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
-        SDL_FreeSurface(textSurface);
-    }
-
-    int textW, textH;
-    SDL_QueryTexture(textTexture, nullptr, nullptr, &textW, &textH);
-
-    // Make a rectangle to fit the text
-    SDL_Rect textRect = {exampleRect.x + (exampleRect.w - textW) / 2,
-                         exampleRect.y + (exampleRect.h - textH) / 2, textW,
-                         textH};
-
-    // 3. Simple event loop (so the window stays open)
-    bool running = true;
-    SDL_Event event;
-
-    while (running) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = false;
-            } else if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_q)
-                    running = false;
-                if (event.key.keysym.sym == SDLK_RIGHT) {
-                    exampleRect.w += 10;
-                    exampleRect.x -= 5;
-                    textRect = {exampleRect.x + (exampleRect.w - textW) / 2,
-                                exampleRect.y + (exampleRect.h - textH) / 2,
-                                textW, textH};
-                }
-                if (event.key.keysym.sym == SDLK_LEFT) {
-                    exampleRect.w -= 10;
-                    exampleRect.x += 5;
-                    textRect = {exampleRect.x + (exampleRect.w - textW) / 2,
-                                exampleRect.y + (exampleRect.h - textH) / 2,
-                                textW, textH};
-                }
-                if (event.key.keysym.sym == SDLK_UP) {
-                    exampleRect.h += 10;
-                    exampleRect.y -= 5;
-                    textRect = {exampleRect.x + (exampleRect.w - textW) / 2,
-                                exampleRect.y + (exampleRect.h - textH) / 2,
-                                textW, textH};
-                }
-                if (event.key.keysym.sym == SDLK_DOWN) {
-                    exampleRect.h -= 10;
-                    exampleRect.y += 5;
-                    textRect = {exampleRect.x + (exampleRect.w - textW) / 2,
-                                exampleRect.y + (exampleRect.h - textH) / 2,
-                                textW, textH};
-                }
-            }
-        }
-        // Actual render loop
-        SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-        SDL_RenderClear(renderer);
-
-        SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0x00, 0xFF);
-        SDL_RenderFillRect(renderer, &exampleRect);
-
-        SDL_RenderCopy(renderer, textTexture, nullptr, &textRect);
-
-        SDL_RenderPresent(renderer);
-
-        // Nothing to render yet
-        SDL_Delay(1000 / TARGET_FPS); // ~60 FPS
-    }
-
-    // 4. Cleanup
-    SDL_DestroyTexture(textTexture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+void cleanRenderer(GameRenderer &renderer) {
+    SDL_DestroyRenderer(renderer.renderer);
+    SDL_DestroyWindow(renderer.window);
     SDL_Quit();
+}
+
+/* ==== Input ==== */
+struct GameStatus {
+    bool running;
+};
+
+void handlePlayerInput(GameBoard const &board, GameRenderer &game_renderer,
+                       GameStatus &game_status) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT) {
+            game_status.running = false;
+        } else if (event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_q)
+                game_status.running = false;
+        }
+    }
+}
+
+/* ==== MAIN ==== */
+
+GameStatus game_status;
+static const char *APP_NAME = "2048 Renew";
+
+GameBoard game;
+const GameConfig DEFAULT_GAME_CONFIG = {4, 5};
+GameRenderer game_renderer = {800, 800, APP_NAME, nullptr, nullptr};
+
+int main(int argc, char *argv[]) {
+
+    initGame(DEFAULT_GAME_CONFIG, game);
+
+    if (initRenderer(game_renderer) != 0)
+        return 1;
+
+    game_status.running = true;
+
+    while (game_status.running) {
+        handlePlayerInput(game, game_renderer, game_status);
+        renderGame(game, game_renderer);
+    }
+
+    cleanRenderer(game_renderer);
 
     return 0;
 }
