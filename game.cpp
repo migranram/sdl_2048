@@ -144,7 +144,7 @@ typedef struct GameBoard
                 u16 dist     = 1;
                 while (curr_val == 0 && dist++ < this->width)
                 {
-                    shiftHorizontal(sign, i,j);
+                    shiftHorizontal(sign, i, j);
                     curr_val = this->getCellValue(j, i);
                 }
             }
@@ -167,7 +167,7 @@ typedef struct GameBoard
                 u16 dist     = 1;
                 while (curr_val == 0 && dist++ < this->width)
                 {
-                    shiftHorizontal(sign, i,j);
+                    shiftHorizontal(sign, i, j);
                     curr_val = this->getCellValue(j, i);
                 }
             }
@@ -195,6 +195,28 @@ typedef struct GameBoard
         addRandomValue();
     }
 
+    u16 getEmptyCells()
+    {
+        u16 count = 0;
+        for (u16 i = 0; i < this->width; i++)
+        {
+            for (u16 j = 0; j < this->height; j++)
+            {
+                if (getCellValue(i, j) == 0)
+                    count++;
+            }
+        }
+        return count;
+    }
+
+    bool checkBlock()
+    {
+        if (getEmptyCells() > 0)
+            return false;
+
+        return true;
+    }
+
     void addRandomValue(u16 max_pow = 4)
     {
         const int r   = rand() % max_pow;
@@ -205,6 +227,8 @@ typedef struct GameBoard
         {
             x = rand() % this->width;
             y = rand() % this->height;
+            if (getEmptyCells() == 0)
+                return;
         } while (getCellValue(x, y) != 0);
 
         setCellValue(x, y, val);
@@ -221,7 +245,6 @@ void initGame(GameConfig const& config, GameBoard& game)
     srand(time(NULL));
     game.init(config.width, config.height);
     game.addRandomValue(2);
-
 }
 
 /* ==== Rendering ==== */
@@ -236,6 +259,39 @@ struct GameRenderer
 };
 
 static const SDL_Color BACKGROUND_COLOR = {0xFF, 0xFF, 0xFF, 0xFF};
+
+SDL_Color getCellColor(u16 value)
+{
+    switch (value)
+    {
+    case 0:
+        return {200, 200, 200, 255}; // empty
+    case 2:
+        return {238, 228, 218, 255};
+    case 4:
+        return {237, 224, 200, 255};
+    case 8:
+        return {242, 177, 121, 255};
+    case 16:
+        return {245, 149, 99, 255};
+    case 32:
+        return {246, 124, 95, 255};
+    case 64:
+        return {246, 94, 59, 255};
+    case 128:
+        return {237, 207, 114, 255};
+    case 256:
+        return {237, 204, 97, 255};
+    case 512:
+        return {237, 200, 80, 255};
+    case 1024:
+        return {237, 197, 63, 255};
+    case 2048:
+        return {237, 194, 46, 255};
+    default:
+        return {60, 58, 50, 255}; // overflow tiles
+    }
+}
 
 int renderCell(u16 x,
                u16 y,
@@ -269,7 +325,8 @@ int renderCell(u16 x,
 
     /* Rendering */
     // Square
-    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0x00, 0xFF);
+    const auto color = getCellColor(value);
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
     SDL_RenderFillRect(renderer, &backgroundRect);
 
     // Text
@@ -412,6 +469,7 @@ void cleanRenderer(GameRenderer& renderer)
 struct GameStatus
 {
     bool running;
+    bool can_play;
 };
 
 void handlePlayerInput(GameBoard& board, GameRenderer& game_renderer,
@@ -428,14 +486,17 @@ void handlePlayerInput(GameBoard& board, GameRenderer& game_renderer,
         {
             if (event.key.keysym.sym == SDLK_q)
                 game_status.running = false;
-            if (event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_s)
-                board.moveDown();
-            if (event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_w)
-                board.moveUp();
-            if (event.key.keysym.sym == SDLK_LEFT || event.key.keysym.sym == SDLK_a)
-                board.moveLeft();
-            if (event.key.keysym.sym == SDLK_RIGHT || event.key.keysym.sym == SDLK_d)
-                board.moveRight();
+            if (game_status.can_play == true)
+            {
+                if (event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_s)
+                    board.moveDown();
+                if (event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_w)
+                    board.moveUp();
+                if (event.key.keysym.sym == SDLK_LEFT || event.key.keysym.sym == SDLK_a)
+                    board.moveLeft();
+                if (event.key.keysym.sym == SDLK_RIGHT || event.key.keysym.sym == SDLK_d)
+                    board.moveRight();
+            }
         }
     }
 }
@@ -458,13 +519,15 @@ int main(int argc, char* argv[])
         return 1;
 
     game_status.running = true;
+    game_status.can_play = true;
 
     while (game_status.running)
     {
         handlePlayerInput(game, game_renderer, game_status);
         if (renderGame(game, game_renderer))
             game_status.running = false;
-        ;
+        if (game.checkBlock())
+            game_status.can_play = false;
     }
 
     cleanRenderer(game_renderer);
