@@ -46,6 +46,46 @@ typedef struct GameBoard
         this->data[y * width + x] = value;
     }
 
+    void shiftVertical(i8 sign, u16 col, u16 start = 0)
+    {
+        assert(sign == 1 || sign == -1);
+
+        u16 init_val   = start;
+        u16 target_val = (sign == 1) ? this->height - 1 : 0;
+
+        for (u16 j = init_val; j != target_val; j += sign)
+        {
+            u16 next_val = this->getCellValue(col, j + sign);
+
+            this->setCellValue(col, j, next_val);
+
+            if (j == target_val - sign)
+            {
+                this->setCellValue(col, j + sign, 0);
+            }
+        }
+    }
+
+    void shiftHorizontal(i8 sign, u16 row, u16 start = 0)
+    {
+        assert(sign == 1 || sign == -1);
+
+        u16 init_val   = start;
+        u16 target_val = (sign == 1) ? this->width - 1 : 0;
+
+        for (u16 i = init_val; i != target_val; i += sign)
+        {
+            u16 next_val = this->getCellValue(i + sign, row);
+
+            this->setCellValue(i, row, next_val);
+
+            if (i == target_val - sign)
+            {
+                this->setCellValue(i + sign, row, 0);
+            }
+        }
+    }
+
     void moveVertical(i8 sign)
     {
         assert(sign == 1 || sign == -1);
@@ -56,17 +96,35 @@ typedef struct GameBoard
         {
             for (u16 j = init_val; j != target_val; j += sign)
             {
+                u16 curr_val = this->getCellValue(i, j);
+                u16 dist     = 1;
+                while (curr_val == 0 && dist++ < this->height)
+                {
+                    shiftVertical(sign, i, j);
+                    curr_val = this->getCellValue(i, j);
+                }
+            }
+
+            for (u16 j = init_val; j != target_val; j += sign)
+            {
                 u16 curr_val  = this->getCellValue(i, j);
                 u16 other_val = this->getCellValue(i, j + sign);
+
                 if (curr_val == other_val)
                 {
                     this->setCellValue(i, j, curr_val * 2);
                     this->setCellValue(i, j + sign, 0);
                 }
-                else if (curr_val == 0)
+            }
+
+            for (u16 j = init_val; j != target_val; j += sign)
+            {
+                u16 curr_val = this->getCellValue(i, j);
+                u16 dist     = 1;
+                while (curr_val == 0 && dist++ < this->height)
                 {
-                    this->setCellValue(i, j, other_val);
-                    this->setCellValue(i, j + sign, 0);
+                    shiftVertical(sign, i, j);
+                    curr_val = this->getCellValue(i, j);
                 }
             }
         }
@@ -78,21 +136,39 @@ typedef struct GameBoard
         u16 init_val   = (sign == 1) ? 0 : this->width - 1;
         u16 target_val = (sign == 1) ? this->width - 1 : 0;
 
-        for (u16 j = 0; j < this->height; j++)
+        for (u16 i = 0; i < this->height; i++)
         {
-            for (u16 i = init_val; i != target_val; i += sign)
+            for (u16 j = init_val; j != target_val; j += sign)
             {
-                u16 curr_val  = this->getCellValue(i, j);
-                u16 other_val = this->getCellValue(i + sign, j);
+                u16 curr_val = this->getCellValue(j, i);
+                u16 dist     = 1;
+                while (curr_val == 0 && dist++ < this->width)
+                {
+                    shiftHorizontal(sign, i,j);
+                    curr_val = this->getCellValue(j, i);
+                }
+            }
+
+            for (u16 j = init_val; j != target_val; j += sign)
+            {
+                u16 curr_val  = this->getCellValue(j, i);
+                u16 other_val = this->getCellValue(j + sign, i);
+
                 if (curr_val == other_val)
                 {
-                    this->setCellValue(i, j, curr_val * 2);
-                    this->setCellValue(i + sign, j, 0);
+                    this->setCellValue(j, i, curr_val * 2);
+                    this->setCellValue(j + sign, i, 0);
                 }
-                else if (curr_val == 0)
+            }
+
+            for (u16 j = init_val; j != target_val; j += sign)
+            {
+                u16 curr_val = this->getCellValue(j, i);
+                u16 dist     = 1;
+                while (curr_val == 0 && dist++ < this->width)
                 {
-                    this->setCellValue(i, j, other_val);
-                    this->setCellValue(i + sign, j, 0);
+                    shiftHorizontal(sign, i,j);
+                    curr_val = this->getCellValue(j, i);
                 }
             }
         }
@@ -119,9 +195,9 @@ typedef struct GameBoard
         addRandomValue();
     }
 
-    void addRandomValue()
+    void addRandomValue(u16 max_pow = 4)
     {
-        const int r   = rand() % 3;
+        const int r   = rand() % max_pow;
         const u16 val = std::pow(2, r);
 
         u16 x, y;
@@ -144,7 +220,8 @@ void initGame(GameConfig const& config, GameBoard& game)
 {
     srand(time(NULL));
     game.init(config.width, config.height);
-    game.addRandomValue();
+    game.addRandomValue(2);
+
 }
 
 /* ==== Rendering ==== */
