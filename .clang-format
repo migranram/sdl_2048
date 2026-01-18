@@ -1,4 +1,30 @@
 ---
-# We'll use defaults from the LLVM style, but with 4 columns indentation.
-BasedOnStyle: LLVM
+BasedOnStyle: Microsoft
+BraceWrapping:
+  AfterCaseLabel: true
+AccessModifierOffset: -2
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: false
+AlignOperands: true
+AllowShortIfStatementsOnASingleLine: Never
+BreakBeforeBraces: Allman
+PackConstructorInitializers: Never
+BreakConstructorInitializers: AfterColon
+ConstructorInitializerIndentWidth: 2
+ContinuationIndentWidth: 2
 IndentWidth: 4
+Language: Cpp
+NamespaceIndentation: None
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 0
+PointerAlignment: Left
+PenaltyBreakComment: 300
+PenaltyBreakString: 1000
+SpaceInEmptyParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SortIncludes: true
+Standard: c++17
+...
