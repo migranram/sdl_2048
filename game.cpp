@@ -195,7 +195,7 @@ typedef struct GameBoard
         addRandomValue();
     }
 
-    u16 getEmptyCells()
+    u16 getEmptyCells() const
     {
         u16 count = 0;
         for (u16 i = 0; i < this->width; i++)
@@ -207,6 +207,21 @@ typedef struct GameBoard
             }
         }
         return count;
+    }
+
+    u16 getMaxValue() const
+    {
+        u16 max = 0;
+        for (u16 i = 0; i < this->width; i++)
+        {
+            for (u16 j = 0; j < this->height; j++)
+            {
+                auto val = getCellValue(i, j);
+                if (val > max)
+                    max = val;
+            }
+        }
+        return max;
     }
 
     bool checkBlock()
@@ -239,6 +254,12 @@ typedef struct GameConfig
 {
     u16 width, height;
 } GameConfig;
+
+struct GameStatus
+{
+    bool running;
+    bool can_play;
+};
 
 void initGame(GameConfig const& config, GameBoard& game)
 {
@@ -339,16 +360,24 @@ int renderHeader(u16 x,
                  u16 y,
                  u16 w,
                  u16 h,
-                 GameRenderer const& game_renderer)
+                 GameRenderer const& game_renderer,
+                 GameStatus const& status,
+                 GameBoard const& board)
 {
     auto const& renderer    = game_renderer.renderer;
     SDL_Rect backgroundRect = {x, y, w, h};
 
     SDL_Texture* textTexture;
     {
+        char text[100];
+
+        if (status.can_play)
+            sprintf(text, "%s", "Get to 2048!");
+        else
+            sprintf(text, "Finished! Score achieved: %d", board.getMaxValue());
         SDL_Color textColor      = {0, 0, 0, 255};
         SDL_Surface* textSurface = TTF_RenderText_Blended(
-          game_renderer.font, "2048 Header!", textColor);
+          game_renderer.font, text, textColor);
         textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
         SDL_FreeSurface(textSurface);
     }
@@ -372,7 +401,7 @@ int renderHeader(u16 x,
     return 0;
 }
 
-int renderGame(GameBoard const& board, GameRenderer& game_renderer)
+int renderGame(GameBoard const& board, GameRenderer& game_renderer, GameStatus& game_status)
 {
 
     auto& renderer = game_renderer.renderer;
@@ -386,7 +415,7 @@ int renderGame(GameBoard const& board, GameRenderer& game_renderer)
     const u16 header_h = game_renderer.screen_height * 0.2;
     const u16 ch       = (game_renderer.screen_height - header_h) / board.height;
 
-    renderHeader(padding, padding, game_renderer.screen_width - padding * 2, header_h - padding * 2, game_renderer);
+    renderHeader(padding, padding, game_renderer.screen_width - padding * 2, header_h - padding * 2, game_renderer, game_status, board);
 
     for (u16 i = 0; i < board.width; i++)
     {
@@ -466,11 +495,6 @@ void cleanRenderer(GameRenderer& renderer)
 }
 
 /* ==== Input ==== */
-struct GameStatus
-{
-    bool running;
-    bool can_play;
-};
 
 void handlePlayerInput(GameBoard& board, GameRenderer& game_renderer,
                        GameStatus& game_status)
@@ -518,13 +542,13 @@ int main(int argc, char* argv[])
     if (initRenderer(game_renderer) != 0)
         return 1;
 
-    game_status.running = true;
+    game_status.running  = true;
     game_status.can_play = true;
 
     while (game_status.running)
     {
         handlePlayerInput(game, game_renderer, game_status);
-        if (renderGame(game, game_renderer))
+        if (renderGame(game, game_renderer, game_status))
             game_status.running = false;
         if (game.checkBlock())
             game_status.can_play = false;
