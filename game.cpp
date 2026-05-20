@@ -1,7 +1,11 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_timer.h>
 #include <SDL2/SDL_ttf.h>
 
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
@@ -10,6 +14,7 @@ typedef uint16_t u16;
 typedef int32_t i32;
 typedef uint8_t u8;
 typedef int8_t i8;
+typedef uint64_t u64;
 
 static constexpr char FONT_PATH[] =
   "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf";
@@ -19,7 +24,8 @@ typedef struct GameBoard
 {
     u16 width, height;
 
-    u16* data = nullptr;
+    u16* data     = nullptr;
+    u16* target_data = nullptr;
 
     void init(u16 width, u16 height)
     {
@@ -30,6 +36,25 @@ typedef struct GameBoard
             free(data);
 
         this->data = (u16*)calloc(height * width, sizeof(u16));
+
+        if (this->target_data != nullptr)
+            free(target_data);
+
+        this->target_data = (u16*)calloc(height * width, sizeof(u16));
+    }
+
+    u16 getCellTargetValue(u16 x, u16 y) const
+    {
+        assert(x < width || y < height || data != nullptr);
+
+        return this->target_data[y * width + x];
+    }
+
+    void setCellTargetValue(u16 x, u16 y, u16 value)
+    {
+        assert(x < width || y < height || data != nullptr);
+
+        this->target_data[y * width + x] = value;
     }
 
     u16 getCellValue(u16 x, u16 y) const
@@ -46,6 +71,21 @@ typedef struct GameBoard
         this->data[y * width + x] = value;
     }
 
+    void swap_buffers()
+    {
+        u16* tmp       = this->data;
+        this->data     = this->target_data;
+        this->target_data = tmp;
+    }
+
+    void copy_buffers(bool data_as_src)
+    {
+        if (data_as_src)
+            memcpy(this->target_data, this->data, this->width * this->height * sizeof(u16));
+        else
+            memcpy(this->data, this->target_data, this->width * this->height * sizeof(u16));
+    }
+
     void shiftVertical(i8 sign, u16 col, u16 start = 0)
     {
         assert(sign == 1 || sign == -1);
@@ -55,13 +95,13 @@ typedef struct GameBoard
 
         for (u16 j = init_val; j != target_val; j += sign)
         {
-            u16 next_val = this->getCellValue(col, j + sign);
+            u16 next_val = this->getCellTargetValue(col, j + sign);
 
-            this->setCellValue(col, j, next_val);
+            this->setCellTargetValue(col, j, next_val);
 
             if (j == target_val - sign)
             {
-                this->setCellValue(col, j + sign, 0);
+                this->setCellTargetValue(col, j + sign, 0);
             }
         }
     }
@@ -75,13 +115,13 @@ typedef struct GameBoard
 
         for (u16 i = init_val; i != target_val; i += sign)
         {
-            u16 next_val = this->getCellValue(i + sign, row);
+            u16 next_val = this->getCellTargetValue(i + sign, row);
 
-            this->setCellValue(i, row, next_val);
+            this->setCellTargetValue(i, row, next_val);
 
             if (i == target_val - sign)
             {
-                this->setCellValue(i + sign, row, 0);
+                this->setCellTargetValue(i + sign, row, 0);
             }
         }
     }
@@ -96,35 +136,35 @@ typedef struct GameBoard
         {
             for (u16 j = init_val; j != target_val; j += sign)
             {
-                u16 curr_val = this->getCellValue(i, j);
+                u16 curr_val = this->getCellTargetValue(i, j);
                 u16 dist     = 1;
                 while (curr_val == 0 && dist++ < this->height)
                 {
                     shiftVertical(sign, i, j);
-                    curr_val = this->getCellValue(i, j);
+                    curr_val = this->getCellTargetValue(i, j);
                 }
             }
 
             for (u16 j = init_val; j != target_val; j += sign)
             {
-                u16 curr_val  = this->getCellValue(i, j);
-                u16 other_val = this->getCellValue(i, j + sign);
+                u16 curr_val  = this->getCellTargetValue(i, j);
+                u16 other_val = this->getCellTargetValue(i, j + sign);
 
                 if (curr_val == other_val)
                 {
-                    this->setCellValue(i, j, curr_val * 2);
-                    this->setCellValue(i, j + sign, 0);
+                    this->setCellTargetValue(i, j, curr_val * 2);
+                    this->setCellTargetValue(i, j + sign, 0);
                 }
             }
 
             for (u16 j = init_val; j != target_val; j += sign)
             {
-                u16 curr_val = this->getCellValue(i, j);
+                u16 curr_val = this->getCellTargetValue(i, j);
                 u16 dist     = 1;
                 while (curr_val == 0 && dist++ < this->height)
                 {
                     shiftVertical(sign, i, j);
-                    curr_val = this->getCellValue(i, j);
+                    curr_val = this->getCellTargetValue(i, j);
                 }
             }
         }
@@ -140,35 +180,35 @@ typedef struct GameBoard
         {
             for (u16 j = init_val; j != target_val; j += sign)
             {
-                u16 curr_val = this->getCellValue(j, i);
+                u16 curr_val = this->getCellTargetValue(j, i);
                 u16 dist     = 1;
                 while (curr_val == 0 && dist++ < this->width)
                 {
                     shiftHorizontal(sign, i, j);
-                    curr_val = this->getCellValue(j, i);
+                    curr_val = this->getCellTargetValue(j, i);
                 }
             }
 
             for (u16 j = init_val; j != target_val; j += sign)
             {
-                u16 curr_val  = this->getCellValue(j, i);
-                u16 other_val = this->getCellValue(j + sign, i);
+                u16 curr_val  = this->getCellTargetValue(j, i);
+                u16 other_val = this->getCellTargetValue(j + sign, i);
 
                 if (curr_val == other_val)
                 {
-                    this->setCellValue(j, i, curr_val * 2);
-                    this->setCellValue(j + sign, i, 0);
+                    this->setCellTargetValue(j, i, curr_val * 2);
+                    this->setCellTargetValue(j + sign, i, 0);
                 }
             }
 
             for (u16 j = init_val; j != target_val; j += sign)
             {
-                u16 curr_val = this->getCellValue(j, i);
+                u16 curr_val = this->getCellTargetValue(j, i);
                 u16 dist     = 1;
                 while (curr_val == 0 && dist++ < this->width)
                 {
                     shiftHorizontal(sign, i, j);
-                    curr_val = this->getCellValue(j, i);
+                    curr_val = this->getCellTargetValue(j, i);
                 }
             }
         }
@@ -202,7 +242,7 @@ typedef struct GameBoard
         {
             for (u16 j = 0; j < this->height; j++)
             {
-                if (getCellValue(i, j) == 0)
+                if (getCellTargetValue(i, j) == 0)
                     count++;
             }
         }
@@ -216,7 +256,7 @@ typedef struct GameBoard
         {
             for (u16 j = 0; j < this->height; j++)
             {
-                auto val = getCellValue(i, j);
+                auto val = getCellTargetValue(i, j);
                 if (val > max)
                     max = val;
             }
@@ -244,9 +284,9 @@ typedef struct GameBoard
             y = rand() % this->height;
             if (getEmptyCells() == 0)
                 return;
-        } while (getCellValue(x, y) != 0);
+        } while (getCellTargetValue(x, y) != 0);
 
-        setCellValue(x, y, val);
+        setCellTargetValue(x, y, val);
     }
 } GameBoard;
 
@@ -255,10 +295,17 @@ typedef struct GameConfig
     u16 width, height;
 } GameConfig;
 
+typedef enum
+{
+    IDLE      = 0,
+    ANIMATION = 1,
+} EnginePhase;
+
 struct GameStatus
 {
-    bool running;
-    bool can_play;
+    bool running      = true;
+    bool can_play     = true;
+    EnginePhase phase = EnginePhase::IDLE;
 };
 
 void initGame(GameConfig const& config, GameBoard& game)
@@ -266,6 +313,7 @@ void initGame(GameConfig const& config, GameBoard& game)
     srand(time(NULL));
     game.init(config.width, config.height);
     game.addRandomValue(2);
+    game.copy_buffers(false);
 }
 
 /* ==== Rendering ==== */
@@ -277,6 +325,9 @@ struct GameRenderer
     SDL_Renderer* renderer = nullptr;
     u16 target_fps         = 60;
     TTF_Font* font         = nullptr;
+
+    const u64 animation_duration = 500; // ms
+    u64 current_animation_delta  = 0;
 };
 
 static const SDL_Color BACKGROUND_COLOR = {0xFF, 0xFF, 0xFF, 0xFF};
@@ -392,7 +443,10 @@ int renderHeader(u16 x,
 
     /* Rendering */
     // Square
-    SDL_SetRenderDrawColor(renderer, 0x66, 0xBB, 0xAA, 0xAA);
+    if (status.phase == EnginePhase::ANIMATION)
+        SDL_SetRenderDrawColor(renderer, 0xBB, 0xAA, 0x66, 0xAA);
+    else
+        SDL_SetRenderDrawColor(renderer, 0x66, 0xBB, 0xAA, 0xAA);
     SDL_RenderFillRect(renderer, &backgroundRect);
 
     // Text
@@ -401,7 +455,7 @@ int renderHeader(u16 x,
     return 0;
 }
 
-int renderGame(GameBoard const& board, GameRenderer& game_renderer, GameStatus& game_status)
+int renderGame(GameBoard const& board, GameRenderer& game_renderer, GameStatus& game_status, u64 delta)
 {
 
     auto& renderer = game_renderer.renderer;
@@ -430,9 +484,6 @@ int renderGame(GameBoard const& board, GameRenderer& game_renderer, GameStatus& 
 
     // Render
     SDL_RenderPresent(renderer);
-
-    // Wait for target FPS
-    SDL_Delay(1000 / game_renderer.target_fps); // ~60 FPS
 
     return 0;
 }
@@ -510,7 +561,7 @@ void handlePlayerInput(GameBoard& board, GameRenderer& game_renderer,
         {
             if (event.key.keysym.sym == SDLK_q)
                 game_status.running = false;
-            if (game_status.can_play == true)
+            if (game_status.can_play == true && game_status.phase == EnginePhase::IDLE)
             {
                 if (event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_s)
                     board.moveDown();
@@ -520,6 +571,8 @@ void handlePlayerInput(GameBoard& board, GameRenderer& game_renderer,
                     board.moveLeft();
                 if (event.key.keysym.sym == SDLK_RIGHT || event.key.keysym.sym == SDLK_d)
                     board.moveRight();
+
+                game_status.phase = EnginePhase::ANIMATION;
             }
         }
     }
@@ -545,13 +598,36 @@ int main(int argc, char* argv[])
     game_status.running  = true;
     game_status.can_play = true;
 
+    u64 delta = 0;
+
+    u64 target_ms = 1000 / game_renderer.target_fps;
+
+    u64 now_ticks = SDL_GetTicks64();
+    u64 last_ticks;
     while (game_status.running)
     {
-        handlePlayerInput(game, game_renderer, game_status);
-        if (renderGame(game, game_renderer, game_status))
+        last_ticks = now_ticks;
+        handlePlayerInput(game, game_renderer, game_status); // Update the swap buffer
+        if (renderGame(game, game_renderer, game_status, delta))
             game_status.running = false;
         if (game.checkBlock())
             game_status.can_play = false;
+
+        if (game_status.phase == EnginePhase::ANIMATION)
+        {
+            game_renderer.current_animation_delta += delta;
+            if (game_renderer.current_animation_delta >= game_renderer.animation_duration)
+            {
+                game_renderer.current_animation_delta = 0;
+                game_status.phase                     = EnginePhase::IDLE;
+                game.copy_buffers(false);
+            }
+        }
+
+        now_ticks = SDL_GetTicks64();
+        delta     = now_ticks - last_ticks;
+        // Wait for target FPS
+        SDL_Delay(target_ms); // ~60 FPS
     }
 
     cleanRenderer(game_renderer);
