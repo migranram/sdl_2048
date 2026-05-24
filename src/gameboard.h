@@ -200,29 +200,25 @@ typedef struct GameBoard
     void moveUp()
     {
         moveVertical(1);
-        addRandomValue();
     }
     void moveDown()
     {
         moveVertical(-1);
-        addRandomValue();
     }
     void moveLeft()
     {
         moveHorizontal(1);
-        addRandomValue();
     }
     void moveRight()
     {
         moveHorizontal(-1);
-        addRandomValue();
     }
 
     u16 getEmptyCells() const
     {
         u16 count = 0;
-        for(u16 i = 0; i < this->width * this->height; i++)
-            if(this->data[i] == 0)
+        for (u16 i = 0; i < this->width * this->height; i++)
+            if (this->data[i] == 0)
                 count++;
         return count;
     }
@@ -230,8 +226,8 @@ typedef struct GameBoard
     u16 getMaxValue() const
     {
         u16 max = 0;
-        for(u16 i = 0; i < this->width * this->height; i++)
-            if(this->data[i] > max)
+        for (u16 i = 0; i < this->width * this->height; i++)
+            if (this->data[i] > max)
                 max = this->data[i];
         return max;
     }
@@ -244,10 +240,21 @@ typedef struct GameBoard
         return true;
     }
 
-    void addRandomValue(u16 max_pow = 4)
+    static inline u16 pow(u16 base, u16 exponent)
     {
-        const int r   = rand() % max_pow;
-        const u16 val = std::pow(2, r);
+        u16 res = 1;
+
+        for (u16 e = 0; e < exponent; e++)
+            res *= base;
+
+        return res;
+    }
+
+    void addRandomValue(u16 min_pow = 0, u16 max_pow = 4)
+    {
+        assert(min_pow <= max_pow);
+        const int r   = rand() % (max_pow - min_pow) + min_pow;
+        const u16 val = pow(2, r);
 
         u16 x, y;
         do

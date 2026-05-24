@@ -15,7 +15,7 @@ void initGame(GameConfig const& config, GameBoard& game)
 {
     srand(time(NULL));
     game.init(config.width, config.height);
-    game.addRandomValue(2);
+    game.addRandomValue(1, 2);
     game.copy_buffers(false);
 }
 

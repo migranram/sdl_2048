@@ -22,13 +22,25 @@ void handlePlayerInput(GameBoard& board, GameStatus& game_status)
             if (game_status.can_play == true && game_status.phase == GamePhase::IDLE)
             {
                 if (event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_s)
+                {
                     board.moveDown();
+                    board.addRandomValue(1, 3);
+                }
                 if (event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_w)
+                {
                     board.moveUp();
+                    board.addRandomValue(1, 3);
+                }
                 if (event.key.keysym.sym == SDLK_LEFT || event.key.keysym.sym == SDLK_a)
+                {
                     board.moveLeft();
+                    board.addRandomValue(1, 3);
+                }
                 if (event.key.keysym.sym == SDLK_RIGHT || event.key.keysym.sym == SDLK_d)
+                {
                     board.moveRight();
+                    board.addRandomValue(1, 3);
+                }
 
                 game_status.phase = GamePhase::ANIMATION;
             }
